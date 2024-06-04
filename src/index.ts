@@ -1,5 +1,10 @@
 import { Bot, GrammyError, HttpError, session } from "grammy";
-import { Config, RegistrationSteps, phoneMasks } from "./utils";
+import {
+  Config,
+  RegistrationSteps,
+  isValidPhoneNumber,
+  phoneMasks,
+} from "./utils";
 import { BotContext } from "./bot";
 import { prisma } from "./utils/prisma";
 import { SendPhoneMenu } from "./bot/menu";
@@ -77,7 +82,7 @@ userBot.use(async (ctx, next) => {
   const contact = message.contact?.phone_number;
 
   const phoneData = {
-    phone: "",
+    phone: contact,
   };
 
   switch (step) {
@@ -105,13 +110,8 @@ userBot.use(async (ctx, next) => {
         break;
       }
 
-      if (contact) {
-        phoneData.phone = contact;
-      } else {
-        const text = message.text;
-        if (!text) return;
-
-        if (!phoneMasks.some((mask) => mask.test(text)))
+      if (!contact) {
+        if (!isValidPhoneNumber(message.text))
           return await ctx.reply(
             "Вы некорректно ввели телефон. Попробуйте ещё раз!",
             {
@@ -119,7 +119,7 @@ userBot.use(async (ctx, next) => {
             },
           );
 
-        phoneData.phone = text;
+        phoneData.phone = message.text!;
       }
 
       ctx.session.user = await prisma.user.update({
