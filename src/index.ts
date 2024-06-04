@@ -1,10 +1,5 @@
 import { Bot, GrammyError, HttpError, session } from "grammy";
-import {
-  Config,
-  RegistrationSteps,
-  isValidPhoneNumber,
-  phoneMasks,
-} from "./utils";
+import { Config, RegistrationSteps, isValidPhoneNumber } from "./utils";
 import { BotContext } from "./bot";
 import { prisma } from "./utils/prisma";
 import { SendPhoneMenu } from "./bot/menu";
