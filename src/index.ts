@@ -23,32 +23,123 @@ bot.catch((err) => {
 
 bot.use(session({ initial: () => ({}) }));
 
-bot.command("start", async (ctx) => {
+// TODO: Сделать проверку на админа
+const adminBot = bot.filter(() => {
+  const isAdmin = false;
+  return isAdmin;
+});
+
+adminBot.command("start", async (ctx) => {
+  ctx.reply("Admin");
+});
+
+// TODO: Сделать проверку на НЕ админа
+const userBot = bot.filter(() => {
+  const isUser = true;
+  return isUser;
+});
+
+// Установка пользователя в сессию
+userBot.use(async (ctx, next) => {
   const id = ctx.from?.id;
   const nickname = ctx.from?.username;
   if (!id || !nickname) return;
 
-  // TODO: Сделать проверку на админа
-  const isAdmin = false;
-  if (isAdmin) return;
-
-  const user = await prisma.user.findFirst({
-    where: {
-      id,
-    },
-  });
+  const user = await prisma.user.findFirst({ where: { id } });
 
   if (!user) {
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         id,
         nickname,
       },
     });
-    ctx.session.registrationStep = RegistrationSteps.FIO;
-    await ctx.reply("Введите ФИО");
-    return;
+
+    ctx.session.user = user;
+  } else {
+    ctx.session.user = user;
   }
+
+  next();
+});
+
+// Регистрация пользователя (обработка шагов)
+userBot.use(async (ctx, next) => {
+  const user = ctx.session.user;
+  if (!user) return;
+
+  const step = ctx.session.registrationStep;
+  if (!step) return next();
+
+  const message = ctx.message;
+  if (!message) return;
+
+  const contact = message.contact?.phone_number;
+
+  const phoneData = {
+    phone: "",
+  };
+
+  switch (step) {
+    case RegistrationSteps.FIO:
+      ctx.session.user = await prisma.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          fio: message.text,
+        },
+      });
+
+      if (ctx.session.user.phone) return next();
+
+      ctx.session.registrationStep = RegistrationSteps.PHONE;
+      await ctx.reply("Введите номер телефона в формате +79123456789", {
+        reply_markup: SendPhoneMenu,
+      });
+
+      break;
+    case RegistrationSteps.PHONE:
+      if (user.phone) {
+        ctx.session.registrationStep = undefined;
+        break;
+      }
+
+      if (contact) {
+        phoneData.phone = contact;
+      } else {
+        const text = message.text;
+        if (!text) return;
+
+        if (!phoneMasks.some((mask) => mask.test(text)))
+          return await ctx.reply(
+            "Вы некорректно ввели телефон. Попробуйте ещё раз!",
+            {
+              reply_markup: SendPhoneMenu,
+            },
+          );
+
+        phoneData.phone = text;
+      }
+
+      ctx.session.user = await prisma.user.update({
+        where: {
+          id: user.id,
+        },
+        data: phoneData,
+      });
+
+      ctx.session.registrationStep = undefined;
+      // TODO: Добавить меню
+      await ctx.reply("Всё хорошо, тут будет меню");
+      break;
+  }
+});
+
+// Валидация пользователя
+userBot.use(async (ctx, next) => {
+  const user = ctx.session.user;
+  if (!user) return;
 
   if (!user.fio) {
     ctx.session.registrationStep = RegistrationSteps.FIO;
@@ -64,97 +155,14 @@ bot.command("start", async (ctx) => {
     return;
   }
 
+  return next();
+});
+
+userBot.command("start", async (ctx) => {
   // TODO: Отправить меню
   await ctx.reply("Отправить меню");
 });
 
-bot.use(async (ctx, next) => {
-  const user = await prisma.user.findFirst({
-    where: {
-      id: ctx.from?.id,
-    },
-  });
-
-  if (!user) return;
-
-  const step = ctx.session.registrationStep;
-
-  if (!step) {
-    if (!user.fio) {
-      ctx.session.registrationStep = RegistrationSteps.FIO;
-      await ctx.reply("Введите ФИО");
-      return;
-    }
-
-    if (!user.phone) {
-      ctx.session.registrationStep = RegistrationSteps.PHONE;
-      await ctx.reply("Введите номер телефона в формате +79123456789", {
-        reply_markup: SendPhoneMenu,
-      });
-      return;
-    }
-
-    return next();
-  }
-
-  const message = ctx.message;
-  if (!message) return;
-
-  const contact = message.contact?.phone_number;
-
-  const phoneData = {
-    phone: "",
-  };
-
-  switch (step) {
-    case RegistrationSteps.FIO:
-      await prisma.user.update({
-        where: {
-          id: user.id,
-        },
-        data: {
-          fio: message.text,
-        },
-      });
-
-      ctx.session.registrationStep = RegistrationSteps.PHONE;
-      await ctx.reply("Введите номер телефона в формате +79123456789", {
-        reply_markup: SendPhoneMenu,
-      });
-      break;
-    case RegistrationSteps.PHONE:
-      if (user.phone) {
-        ctx.session.registrationStep = undefined;
-        break;
-      }
-
-      if (contact) {
-        phoneData.phone = contact;
-      } else {
-        const text = message.text;
-        if (!text) return;
-
-        if (!phoneMasks.some((mask) => mask.test(text)))
-          return await ctx.reply("Повторите попытку", {
-            reply_markup: SendPhoneMenu,
-          });
-
-        phoneData.phone = text;
-      }
-
-      await prisma.user.update({
-        where: {
-          id: user.id,
-        },
-        data: phoneData,
-      });
-      ctx.session.registrationStep = undefined;
-      // TODO: Добавить меню
-      await ctx.reply("Всё хорошо, тут будет меню");
-      break;
-  }
-});
-
-bot.on("message", (ctx) => ctx.react("🔥"));
+userBot.on("message", (ctx) => ctx.react("🔥"));
 
 bot.start();
