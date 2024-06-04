@@ -1,4 +1,4 @@
 export const enum RegistrationSteps {
-  FIO,
-  PHONE,
+  FIO = "FIO",
+  PHONE = "PHONE",
 }
