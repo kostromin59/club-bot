@@ -55,12 +55,14 @@ adminBot.hears(Commands.Events, async (ctx) => {
   });
 });
 
+// Нажатие на кнопку "Создать мероприятие"
 adminBot.callbackQuery(Commands.CreateEvent, async (ctx) => {
   ctx.session.createEvent.step = CreateEventSteps.Name;
   await ctx.answerCallbackQuery("Начало создания мероприятия");
   await ctx.reply("Введите название мероприятия");
 });
 
+// Создание мероприятий
 adminBot.use(async (ctx, next) => {
   const step = ctx.session.createEvent.step;
   if (!step) return next();
