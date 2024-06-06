@@ -14,8 +14,26 @@ datasource db {
 }
 
 model User {
-  id         BigInt  @id @unique
-  nickname   String
-  fio        String?
-  phone      String?
+  id        BigInt         @id @unique
+  nickname  String
+  fio       String?
+  phone     String?
+  UserEvent UserEvent[]
+}
+
+model Event {
+  id         Int         @id @default(autoincrement())
+  name       String
+  dateStart  DateTime
+  place      String
+  usersCount Int?
+  UserEvent  UserEvent[]
+}
+
+model UserEvent {
+  id      Int   @id @default(autoincrement())
+  userId  BigInt
+  eventId Int
+  user    User  @relation(fields: [userId], references: [id])
+  event   Event @relation(fields: [eventId], references: [id])
 }

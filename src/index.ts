@@ -1,8 +1,18 @@
 import { Bot, GrammyError, HttpError, session } from "grammy";
-import { Config, RegistrationSteps, isValidPhoneNumber } from "./utils";
-import { BotContext } from "./bot";
+import {
+  Config,
+  CreateEventSteps,
+  RegistrationSteps,
+  isValidPhoneNumber,
+} from "./utils";
+import {
+  AdminMenu,
+  BotContext,
+  Commands,
+  EventsAdminMenu,
+  SendPhoneMenu,
+} from "./bot";
 import { prisma } from "./utils/prisma";
-import { SendPhoneMenu } from "./bot/menu";
 
 const config = new Config();
 
@@ -21,21 +31,85 @@ bot.catch((err) => {
   }
 });
 
-bot.use(session({ initial: () => ({}) }));
+bot.use(session({ initial: () => ({ createEvent: {} }) }));
 
-// TODO: Сделать проверку на админа
-const adminBot = bot.filter(() => {
-  const isAdmin = false;
+const adminBot = bot.filter((ctx) => {
+  const id = ctx.from?.id;
+  if (!id) return false;
+
+  const isAdmin = config.admins.includes(id);
   return isAdmin;
 });
 
-adminBot.command("start", async (ctx) => {
-  ctx.reply("Admin");
+adminBot.command("start", (ctx) => {
+  ctx.reply("Добро пожаловать!", {
+    reply_markup: AdminMenu,
+  });
 });
 
-// TODO: Сделать проверку на НЕ админа
-const userBot = bot.filter(() => {
-  const isUser = true;
+adminBot.hears(Commands.Events, async (ctx) => {
+  const events = await prisma.event.findMany();
+  console.log(events);
+  await ctx.reply("Тут будет список мероприятий", {
+    reply_markup: EventsAdminMenu,
+  });
+});
+
+adminBot.callbackQuery(Commands.CreateEvent, async (ctx) => {
+  ctx.session.createEvent.step = CreateEventSteps.Name;
+  await ctx.answerCallbackQuery("Начало создания мероприятия");
+  await ctx.reply("Введите название мероприятия");
+});
+
+adminBot.use(async (ctx, next) => {
+  const step = ctx.session.createEvent.step;
+  if (!step) return next();
+
+  const message = ctx.message?.text;
+  if (!message) return;
+
+  switch (step) {
+    case CreateEventSteps.Name:
+      ctx.session.createEvent.data = {
+        name: message,
+        place: "",
+        dateStart: "",
+      };
+
+      ctx.session.createEvent.step = CreateEventSteps.UsersCount;
+      await ctx.reply("Введите количество участников");
+      return;
+    case CreateEventSteps.UsersCount:
+      ctx.session.createEvent.data!.usersCount = Number.parseInt(message);
+
+      ctx.session.createEvent.step = CreateEventSteps.DateStart;
+      await ctx.reply("Введите дату начала");
+      return;
+    case CreateEventSteps.DateStart:
+      ctx.session.createEvent.data!.dateStart = message;
+
+      ctx.session.createEvent.step = CreateEventSteps.Place;
+      await ctx.reply("Введите место проведения");
+      return;
+    case CreateEventSteps.Place:
+      ctx.session.createEvent.data!.place = message;
+
+      await prisma.event.create({
+        data: ctx.session.createEvent.data!,
+      });
+
+      ctx.session.createEvent = {};
+
+      await ctx.reply("Мероприятие создано!");
+      return;
+  }
+});
+
+const userBot = bot.filter((ctx) => {
+  const id = ctx.from?.id;
+  if (!id) return false;
+
+  const isUser = !config.admins.includes(id);
   return isUser;
 });
 
@@ -81,7 +155,7 @@ userBot.use(async (ctx, next) => {
   };
 
   switch (step) {
-    case RegistrationSteps.FIO:
+    case RegistrationSteps.Fio:
       ctx.session.user = await prisma.user.update({
         where: {
           id: user.id,
@@ -93,13 +167,13 @@ userBot.use(async (ctx, next) => {
 
       if (ctx.session.user.phone) return next();
 
-      ctx.session.registrationStep = RegistrationSteps.PHONE;
+      ctx.session.registrationStep = RegistrationSteps.Phone;
       await ctx.reply("Введите номер телефона в формате +79123456789", {
         reply_markup: SendPhoneMenu,
       });
 
       break;
-    case RegistrationSteps.PHONE:
+    case RegistrationSteps.Phone:
       if (user.phone) {
         ctx.session.registrationStep = undefined;
         break;
@@ -137,13 +211,13 @@ userBot.use(async (ctx, next) => {
   if (!user) return;
 
   if (!user.fio) {
-    ctx.session.registrationStep = RegistrationSteps.FIO;
+    ctx.session.registrationStep = RegistrationSteps.Fio;
     await ctx.reply("Введите ФИО");
     return;
   }
 
   if (!user.phone) {
-    ctx.session.registrationStep = RegistrationSteps.PHONE;
+    ctx.session.registrationStep = RegistrationSteps.Phone;
     await ctx.reply("Введите номер телефона в формате +79123456789", {
       reply_markup: SendPhoneMenu,
     });
