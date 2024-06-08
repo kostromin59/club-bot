@@ -1,17 +1,12 @@
-import { Bot, GrammyError, HttpError, session } from "grammy";
+import { Bot, GrammyError, HttpError, InlineKeyboard, session } from "grammy";
 import {
   Config,
   CreateEventSteps,
   RegistrationSteps,
+  getAdminEventsMessage,
   isValidPhoneNumber,
 } from "./utils";
-import {
-  AdminMenu,
-  BotContext,
-  Commands,
-  EventsAdminMenu,
-  SendPhoneMenu,
-} from "./bot";
+import { AdminMenu, BotContext, Commands, SendPhoneMenu } from "./bot";
 import { prisma } from "./utils/prisma";
 
 const config = new Config();
@@ -48,11 +43,69 @@ adminBot.command("start", (ctx) => {
 });
 
 adminBot.hears(Commands.Events, async (ctx) => {
-  const events = await prisma.event.findMany();
-  console.log(events);
-  await ctx.reply("Тут будет список мероприятий", {
-    reply_markup: EventsAdminMenu,
+  const { message, keyboard } = await getAdminEventsMessage();
+
+  await ctx.reply(message, {
+    reply_markup: keyboard,
+    parse_mode: "HTML",
   });
+});
+
+// Изменить страницу
+adminBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.EventsSetPage))
+    return next();
+
+  const page = parseInt(ctx.callbackQuery.data.split(":")[1]);
+  if (!page) return;
+
+  const { message, keyboard } = await getAdminEventsMessage(page);
+
+  await ctx.editMessageText(message, {
+    parse_mode: "HTML",
+    reply_markup: keyboard,
+  });
+});
+
+// Управлять мероприятием
+adminBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.EventsManage))
+    return next();
+
+  const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
+  if (!eventId) return;
+
+  const event = await prisma.event.findFirstOrThrow({
+    where: {
+      id: eventId,
+    },
+  });
+
+  const keyboard = new InlineKeyboard()
+    .text("Удалить", `${Commands.DeleteEvent}:${eventId}`)
+    .row()
+    .text("Показать участников", `${Commands.ShowUsersOnEvent}:${eventId}`);
+
+  const message = `<b>${event.name}</b> (id: ${event.id})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nКол-во участников: ${event.usersCount}\n\nВыберите действие`;
+
+  await ctx.reply(message, {
+    parse_mode: "HTML",
+    reply_markup: keyboard,
+  });
+
+  await ctx.answerCallbackQuery("Выберите действие");
+});
+
+// Удалить мероприятие
+adminBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.DeleteEvent)) return next();
+
+  const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
+  if (!eventId) return;
+
+  await prisma.event.delete({ where: { id: eventId } });
+  await ctx.deleteMessage();
+  await ctx.answerCallbackQuery("Удалено");
 });
 
 // Нажатие на кнопку "Создать мероприятие"

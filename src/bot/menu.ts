@@ -7,7 +7,5 @@ export const SendPhoneMenu = new Keyboard()
 
 export const AdminMenu = new Keyboard().text(Commands.Events).resized();
 
-export const EventsAdminMenu = new InlineKeyboard().text(
-  Commands.CreateEvent,
-  Commands.CreateEvent,
-);
+export const EventsAdminMenu = () =>
+  new InlineKeyboard().text(Commands.CreateEvent, Commands.CreateEvent);
