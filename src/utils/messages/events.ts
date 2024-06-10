@@ -35,7 +35,9 @@ export const getEventsMessage = async (page = 1, isAdmin = false) => {
     return acc;
   }, "");
 
-  const message = `Список мероприятий (Кнопками выберите действие)\n\n${eventsMessage}Страница ${page} из ${pagesCount < 1 ? 1 : pagesCount}`;
+  const message = events.length
+    ? `Список мероприятий (Кнопками выберите действие)\n\n${eventsMessage}Страница ${page} из ${pagesCount < 1 ? 1 : pagesCount}`
+    : "Мероприятий нет!";
   const keyboard = (isAdmin ? EventsAdminMenu() : new InlineKeyboard()).row();
 
   // Кнопки управления

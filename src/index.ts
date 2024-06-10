@@ -1,4 +1,11 @@
-import { Bot, GrammyError, HttpError, InlineKeyboard, session } from "grammy";
+import {
+  Bot,
+  GrammyError,
+  HttpError,
+  InlineKeyboard,
+  InputFile,
+  session,
+} from "grammy";
 import {
   Config,
   CreateEventSteps,
@@ -15,10 +22,22 @@ import {
   UserMenu,
 } from "./bot";
 import { prisma } from "./utils/prisma";
+import xlsx from "xlsx";
+import { Readable } from "node:stream";
 
 const config = new Config();
 
 const bot = new Bot<BotContext>(config.token);
+
+bot.api.setMyCommands([
+  { command: "id", description: "Узнать свой ID" },
+  { command: "start", description: "Начать работу бота" },
+]);
+
+bot.command("id", (ctx) => {
+  if (!ctx.from?.id) return;
+  ctx.reply(ctx.from.id.toString());
+});
 
 bot.catch((err) => {
   const ctx = err.ctx;
@@ -165,6 +184,43 @@ adminBot.use(async (ctx, next) => {
       await ctx.reply("Мероприятие создано!");
       return;
   }
+});
+
+adminBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.ShowUsersOnEvent))
+    return next();
+
+  const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
+  if (!eventId) return;
+
+  const event = await prisma.event.findFirst({
+    where: {
+      id: eventId,
+    },
+    include: {
+      UserEvent: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  if (!event) return;
+
+  const workbook = xlsx.utils.book_new();
+  const worksheet = xlsx.utils.aoa_to_sheet([
+    [event.name],
+    ["ФИО", "Номер телефона", "Telegram username"],
+    ...event.UserEvent.map(({ user }) => [user.fio, user.phone, user.nickname]),
+  ]);
+
+  xlsx.utils.book_append_sheet(workbook, worksheet);
+  const buffer = xlsx.write(workbook, { type: "buffer" });
+  const stream = Readable.from(buffer);
+
+  await ctx.replyWithDocument(new InputFile(stream, `${event.name}.xlsx`));
+  await ctx.answerCallbackQuery("Вам будет отправлен файл");
 });
 
 const userBot = bot.filter((ctx) => {
