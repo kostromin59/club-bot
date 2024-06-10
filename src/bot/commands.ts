@@ -6,4 +6,7 @@ export const enum Commands {
   DeleteEvent = "DeleteEvent",
   // TODO: Сделать обработчик
   ShowUsersOnEvent = "ShowUsersOnEvent",
+  RegisterToEvent = "RegisterToEvent",
+  RegisteredEvents = "Мои записи",
+  DeleteRegistrationToEvent = "DeleteRegisterToEvent",
 }

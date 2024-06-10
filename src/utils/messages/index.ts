@@ -1,1 +1,1 @@
-export * from "./admin-events";
+export * from "./events";

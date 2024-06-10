@@ -3,10 +3,17 @@ import {
   Config,
   CreateEventSteps,
   RegistrationSteps,
-  getAdminEventsMessage,
+  getEventsMessage,
+  getUserRegisteredEventsMessage,
   isValidPhoneNumber,
 } from "./utils";
-import { AdminMenu, BotContext, Commands, SendPhoneMenu } from "./bot";
+import {
+  AdminMenu,
+  BotContext,
+  Commands,
+  SendPhoneMenu,
+  UserMenu,
+} from "./bot";
 import { prisma } from "./utils/prisma";
 
 const config = new Config();
@@ -43,7 +50,7 @@ adminBot.command("start", (ctx) => {
 });
 
 adminBot.hears(Commands.Events, async (ctx) => {
-  const { message, keyboard } = await getAdminEventsMessage();
+  const { message, keyboard } = await getEventsMessage(1, true);
 
   await ctx.reply(message, {
     reply_markup: keyboard,
@@ -59,7 +66,7 @@ adminBot.use(async (ctx, next) => {
   const page = parseInt(ctx.callbackQuery.data.split(":")[1]);
   if (!page) return;
 
-  const { message, keyboard } = await getAdminEventsMessage(page);
+  const { message, keyboard } = await getEventsMessage(page, true);
 
   await ctx.editMessageText(message, {
     parse_mode: "HTML",
@@ -254,8 +261,9 @@ userBot.use(async (ctx, next) => {
       });
 
       ctx.session.registrationStep = undefined;
-      // TODO: Добавить меню
-      await ctx.reply("Всё хорошо, тут будет меню");
+      await ctx.reply("Регистрация окончена!", {
+        reply_markup: UserMenu,
+      });
       break;
   }
 });
@@ -283,10 +291,113 @@ userBot.use(async (ctx, next) => {
 });
 
 userBot.command("start", async (ctx) => {
-  // TODO: Отправить меню
-  await ctx.reply("Отправить меню");
+  await ctx.reply("Добро пожаловать!", {
+    reply_markup: UserMenu,
+  });
 });
 
-userBot.on("message", (ctx) => ctx.react("🔥"));
+// Отправить мероприятия
+userBot.hears(Commands.Events, async (ctx) => {
+  const { message, keyboard } = await getEventsMessage();
+
+  await ctx.reply(message, {
+    reply_markup: keyboard,
+    parse_mode: "HTML",
+  });
+});
+
+// Изменить страницу
+userBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.EventsSetPage))
+    return next();
+
+  const page = parseInt(ctx.callbackQuery.data.split(":")[1]);
+  if (!page) return;
+
+  const { message, keyboard } = await getEventsMessage(page);
+
+  await ctx.editMessageText(message, {
+    parse_mode: "HTML",
+    reply_markup: keyboard,
+  });
+});
+
+// Записаться на мероприятие
+userBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.RegisterToEvent))
+    return next();
+
+  const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
+  if (!eventId) return;
+
+  const user = ctx.session.user;
+  if (!user) return;
+
+  const event = await prisma.event.findFirst({
+    where: {
+      id: eventId,
+    },
+    select: {
+      usersCount: true,
+      _count: true,
+      UserEvent: true,
+    },
+  });
+
+  if (!event) return;
+
+  if (event.UserEvent.some(({ userId }) => userId === user.id))
+    return await ctx.answerCallbackQuery("Вы уже записаны!");
+
+  if (
+    !event.usersCount ||
+    event.usersCount === 0 ||
+    event._count.UserEvent < event.usersCount
+  ) {
+    await prisma.userEvent.create({
+      data: {
+        userId: user.id,
+        eventId,
+      },
+    });
+    await ctx.answerCallbackQuery("Вы успешно записаны!");
+  }
+});
+
+// Отписаться от мероприятия
+userBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.DeleteRegistrationToEvent))
+    return next();
+
+  const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
+  if (!eventId) return;
+
+  const user = ctx.session.user;
+  if (!user) return;
+
+  await prisma.userEvent.deleteMany({
+    where: {
+      userId: user.id,
+      eventId,
+    },
+  });
+
+  const { message, keyboard } = await getUserRegisteredEventsMessage(user.id);
+  await ctx.editMessageText(message, {
+    reply_markup: keyboard,
+    parse_mode: "HTML",
+  });
+  await ctx.answerCallbackQuery("Успешно!");
+});
+
+// Посмотреть записи
+userBot.hears(Commands.RegisteredEvents, async (ctx) => {
+  const user = ctx.session.user;
+  if (!user) return;
+
+  const { message, keyboard } = await getUserRegisteredEventsMessage(user.id);
+
+  await ctx.reply(message, { reply_markup: keyboard, parse_mode: "HTML" });
+});
 
 bot.start();

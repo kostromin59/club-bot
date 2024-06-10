@@ -9,3 +9,8 @@ export const AdminMenu = new Keyboard().text(Commands.Events).resized();
 
 export const EventsAdminMenu = () =>
   new InlineKeyboard().text(Commands.CreateEvent, Commands.CreateEvent);
+
+export const UserMenu = new Keyboard()
+  .text(Commands.Events)
+  .text(Commands.RegisteredEvents)
+  .resized();
