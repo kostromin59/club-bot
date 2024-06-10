@@ -31,7 +31,7 @@ export const getEventsMessage = async (page = 1, isAdmin = false) => {
   const pagesCount = Math.ceil(eventsCount / pageSize);
 
   const eventsMessage = events.reduce((acc, event, index) => {
-    acc += `<b>${event.name}</b> (#${index + 1})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nМаксимальное кол-во участников: ${event.usersCount}\n\n`;
+    acc += `<b>${event.name}</b> (#${index + 1})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nМаксимальное кол-во участников: ${event.usersCount}\nМаксимальное кол-во платных участников: ${event.payersCount}\n\n`;
     return acc;
   }, "");
 
@@ -49,10 +49,12 @@ export const getEventsMessage = async (page = 1, isAdmin = false) => {
     });
   } else {
     events.forEach((event, index) => {
-      keyboard.text(
-        `Записаться на #${index + 1}`,
-        `${Commands.RegisterToEvent}:${event.id}`,
-      );
+      keyboard
+        .text(
+          `Записаться на #${index + 1}`,
+          `${Commands.RegisterToEvent}:${event.id}`,
+        )
+        .row();
     });
   }
 
@@ -103,7 +105,7 @@ export const getUserRegisteredEventsMessage = async (
   }
 
   const eventsMessage = events.reduce((acc, { event }, index) => {
-    acc += `<b>${event.name}</b> (#${index + 1})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nМаксимальное кол-во участников: ${event.usersCount}\n\n`;
+    acc += `<b>${event.name}</b> (#${index + 1})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nМаксимальное кол-во участников: ${event.usersCount}\nМаксимальное кол-во платных участников: ${event.payersCount}\n\n`;
     return acc;
   }, "");
 

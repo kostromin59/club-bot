@@ -28,6 +28,7 @@ model Event {
   dateStart  DateTime
   place      String
   usersCount Int?
+  payersCount Int?
   UserEvent  UserEvent[]
 }
 

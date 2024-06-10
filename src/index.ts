@@ -116,7 +116,7 @@ adminBot.use(async (ctx, next) => {
     .row()
     .text("Показать участников", `${Commands.ShowUsersOnEvent}:${eventId}`);
 
-  const message = `<b>${event.name}</b> (id: ${event.id})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nКол-во участников: ${event.usersCount}\n\nВыберите действие`;
+  const message = `<b>${event.name}</b> (id: ${event.id})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nКол-во участников: ${event.usersCount}\nКол-во платных участников: ${event.payersCount}\n\nВыберите действие`;
 
   await ctx.reply(message, {
     parse_mode: "HTML",
@@ -166,6 +166,12 @@ adminBot.use(async (ctx, next) => {
       return;
     case CreateEventSteps.UsersCount:
       ctx.session.createEvent.data!.usersCount = Number.parseInt(message);
+
+      ctx.session.createEvent.step = CreateEventSteps.PayersCount;
+      await ctx.reply("Введите количество платных участников");
+      return;
+    case CreateEventSteps.PayersCount:
+      ctx.session.createEvent.data!.payersCount = Number.parseInt(message);
 
       ctx.session.createEvent.step = CreateEventSteps.DateStart;
       await ctx.reply(
@@ -217,8 +223,13 @@ adminBot.use(async (ctx, next) => {
   const workbook = xlsx.utils.book_new();
   const worksheet = xlsx.utils.aoa_to_sheet([
     [event.name],
-    ["ФИО", "Номер телефона", "Telegram username"],
-    ...event.UserEvent.map(({ user }) => [user.fio, user.phone, user.nickname]),
+    ["ФИО", "Номер телефона", "Telegram username", "Платник"],
+    ...event.UserEvent.map(({ user }) => [
+      user.fio,
+      user.phone,
+      user.nickname,
+      user.isPayer ? "Да" : "Нет",
+    ]),
   ]);
 
   xlsx.utils.book_append_sheet(workbook, worksheet);
@@ -467,8 +478,17 @@ userBot.use(async (ctx, next) => {
   const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
   if (!eventId) return;
 
-  const user = ctx.session.user;
+  const userId = ctx.session.user?.id;
+  if (!userId) return;
+
+  const user = await prisma.user.findFirst({
+    where: {
+      id: userId,
+    },
+  });
+
   if (!user) return;
+  ctx.session.user = user;
 
   const event = await prisma.event.findFirst({
     where: {
@@ -476,21 +496,33 @@ userBot.use(async (ctx, next) => {
     },
     select: {
       usersCount: true,
-      _count: true,
-      UserEvent: true,
+      payersCount: true,
+      UserEvent: {
+        select: {
+          user: {
+            select: {
+              id: true,
+              isPayer: true,
+            },
+          },
+        },
+      },
     },
   });
 
   if (!event) return;
 
-  if (event.UserEvent.some(({ userId }) => userId === user.id))
+  if (event.UserEvent.some(({ user }) => userId === user.id))
     return await ctx.answerCallbackQuery("Вы уже записаны!");
 
-  if (
-    !event.usersCount ||
-    event.usersCount === 0 ||
-    event._count.UserEvent < event.usersCount
-  ) {
+  const count = event.UserEvent.filter(
+    ({ user: { isPayer } }) => user.isPayer === isPayer,
+  ).length;
+  const eventCount = user.isPayer
+    ? event.payersCount || 0
+    : event.usersCount || 0;
+
+  if (count < eventCount) {
     await prisma.userEvent.create({
       data: {
         userId: user.id,
@@ -498,6 +530,8 @@ userBot.use(async (ctx, next) => {
       },
     });
     await ctx.answerCallbackQuery("Вы успешно записаны!");
+  } else {
+    await ctx.answerCallbackQuery("Нет мест!");
   }
 });
 
