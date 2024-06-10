@@ -14,11 +14,12 @@ datasource db {
 }
 
 model User {
-  id        BigInt         @id @unique
+  id        BigInt      @id @unique
   nickname  String
   fio       String?
   phone     String?
   UserEvent UserEvent[]
+  isPayer   Boolean     @default(false)
 }
 
 model Event {
@@ -31,9 +32,9 @@ model Event {
 }
 
 model UserEvent {
-  id      Int   @id @default(autoincrement())
+  id      Int    @id @default(autoincrement())
   userId  BigInt
   eventId Int
-  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }

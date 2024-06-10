@@ -9,6 +9,7 @@ import {
 import {
   Config,
   CreateEventSteps,
+  PayersSteps,
   RegistrationSteps,
   getEventsMessage,
   getUserRegisteredEventsMessage,
@@ -18,6 +19,7 @@ import {
   AdminMenu,
   BotContext,
   Commands,
+  MakePayersMenu,
   SendPhoneMenu,
   UserMenu,
 } from "./bot";
@@ -225,6 +227,81 @@ adminBot.use(async (ctx, next) => {
 
   await ctx.replyWithDocument(new InputFile(stream, `${event.name}.xlsx`));
   await ctx.answerCallbackQuery("Вам будет отправлен файл");
+});
+
+adminBot.hears(Commands.Users, async (ctx) => {
+  const users = await prisma.user.findMany({
+    orderBy: {
+      fio: "asc",
+    },
+  });
+
+  const workbook = xlsx.utils.book_new();
+  const worksheet = xlsx.utils.aoa_to_sheet([
+    ["ID", "ФИО", "Номер телефона", "Telegram username", "Платник"],
+    ...users.map((user) => [
+      user.id,
+      user.fio,
+      user.phone,
+      user.nickname,
+      user.isPayer ? "Да" : "Нет",
+    ]),
+  ]);
+
+  xlsx.utils.book_append_sheet(workbook, worksheet);
+  const buffer = xlsx.write(workbook, { type: "buffer" });
+  const stream = Readable.from(buffer);
+
+  await ctx.replyWithDocument(new InputFile(stream, "Пользователи.xlsx"), {
+    reply_markup: MakePayersMenu,
+  });
+});
+
+// Добавить платников
+adminBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.MakePayers)) return next();
+
+  ctx.session.payersStep = PayersSteps.MakePayers;
+  await ctx.reply("Укажите через запятую ID пользователей");
+  await ctx.answerCallbackQuery("Укажите через запятую ID пользователей");
+});
+
+// Удалить платников
+adminBot.use(async (ctx, next) => {
+  if (!ctx.callbackQuery?.data?.startsWith(Commands.DeletePayers))
+    return next();
+
+  ctx.session.payersStep = PayersSteps.DeletePayers;
+  await ctx.reply("Укажите через запятую ID пользователей");
+  await ctx.answerCallbackQuery("Укажите через запятую ID пользователей");
+});
+
+// Сделать или убрать платников
+adminBot.use(async (ctx, next) => {
+  if (!ctx.session.payersStep) return next();
+
+  const message = ctx.message?.text;
+  if (!message) return;
+
+  const userIds = message
+    .split(",")
+    .map((uid) => uid.trim())
+    .map(parseInt)
+    .filter((n) => !isNaN(n));
+
+  await prisma.user.updateMany({
+    where: {
+      id: {
+        in: userIds,
+      },
+    },
+    data: {
+      isPayer: ctx.session.payersStep === PayersSteps.MakePayers,
+    },
+  });
+
+  ctx.session.payersStep = undefined;
+  await ctx.reply("Обновлено!");
 });
 
 const userBot = bot.filter((ctx) => {

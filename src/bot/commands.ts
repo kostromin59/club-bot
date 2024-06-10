@@ -8,4 +8,7 @@ export const enum Commands {
   RegisterToEvent = "RegisterToEvent",
   RegisteredEvents = "Мои записи",
   DeleteRegistrationToEvent = "DeleteRegisterToEvent",
+  Users = "Пользователи",
+  MakePayers = "Добавить платников",
+  DeletePayers = "Удалить платников",
 }
