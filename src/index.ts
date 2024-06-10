@@ -101,11 +101,13 @@ adminBot.use(async (ctx, next) => {
   const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
   if (!eventId) return;
 
-  const event = await prisma.event.findFirstOrThrow({
+  const event = await prisma.event.findFirst({
     where: {
       id: eventId,
     },
   });
+
+  if (!event) return;
 
   const keyboard = new InlineKeyboard()
     .text("Удалить", `${Commands.DeleteEvent}:${eventId}`)
@@ -164,7 +166,9 @@ adminBot.use(async (ctx, next) => {
       ctx.session.createEvent.data!.usersCount = Number.parseInt(message);
 
       ctx.session.createEvent.step = CreateEventSteps.DateStart;
-      await ctx.reply("Введите дату начала");
+      await ctx.reply(
+        "Введите дату начала в формате год-месяц-деньTчасы-минуты-секундыZ\nПример: 2024-06-10T12:00:00Z",
+      );
       return;
     case CreateEventSteps.DateStart:
       ctx.session.createEvent.data!.dateStart = message;
