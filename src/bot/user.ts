@@ -1,4 +1,4 @@
-import { Api, Bot, RawApi } from "grammy";
+import { Api, Bot, InlineKeyboard, RawApi } from "grammy";
 import { BotContext } from "./session";
 import {
   Config,
@@ -148,6 +148,133 @@ export const buildUserBot = (
   userBot.hears(Commands.HomeWorks, async (ctx) => {
     const { message, keyboard } = await getHomeWorksMessage();
     await ctx.reply(message, { reply_markup: keyboard, parse_mode: "HTML" });
+  });
+
+  userBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.ShowHomeWork))
+      return next();
+
+    const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!id) return;
+
+    const homeWork = await prisma.homeWork.findFirst({
+      where: {
+        id,
+        answerEndDate: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (!homeWork) return;
+
+    const date = Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(homeWork.createdAt);
+
+    const keyboard = new InlineKeyboard().text(
+      `Выполнить (${date})`,
+      `${Commands.SendAnswerHomeWork}:${homeWork.id}`,
+    );
+
+    await ctx.replyWithDocument(homeWork.filePath, { reply_markup: keyboard });
+    await ctx.answerCallbackQuery(`Задание от ${date}`);
+  });
+
+  // Отправка ответа на ДЗ
+  userBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.SendAnswerHomeWork))
+      return next();
+
+    const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!id) return;
+
+    ctx.session.answerHomeWork = id;
+    await ctx.reply("Отправьте файл или ссылку");
+  });
+
+  userBot.on(":file", async (ctx) => {
+    const id = ctx.session.answerHomeWork;
+    if (!id) return;
+
+    const userId = ctx.session.user?.id;
+    if (!userId) return;
+
+    const file = await ctx.getFile();
+
+    const answer = await prisma.homeWorkAnswer.findFirst({
+      where: {
+        homeWorkId: id,
+        userId,
+      },
+    });
+
+    await prisma.homeWorkAnswer.upsert({
+      create: {
+        userId,
+        homeWorkId: id,
+        filePath: file.file_id,
+      },
+      where: {
+        id: answer?.id ?? 0,
+        userId,
+        homeWorkId: id,
+      },
+      update: {
+        filePath: file.file_id,
+        link: null,
+      },
+    });
+
+    ctx.session.answerHomeWork = undefined;
+
+    await ctx.reply(
+      "Ответ отправлен! Учитываться будет только последний ответ",
+    );
+  });
+
+  userBot.on("msg::url", async (ctx) => {
+    const id = ctx.session.answerHomeWork;
+    if (!id) return;
+
+    const userId = ctx.session.user?.id;
+    if (!userId) return;
+
+    const message = ctx.message?.text;
+    if (!message) return;
+
+    const answer = await prisma.homeWorkAnswer.findFirst({
+      where: {
+        homeWorkId: id,
+        userId,
+      },
+    });
+
+    await prisma.homeWorkAnswer.upsert({
+      create: {
+        userId,
+        homeWorkId: id,
+        link: message,
+      },
+      where: {
+        id: answer?.id ?? 0,
+        userId,
+        homeWorkId: id,
+      },
+      update: {
+        filePath: null,
+        link: message,
+      },
+    });
+
+    ctx.session.answerHomeWork = undefined;
+
+    await ctx.reply(
+      "Ответ отправлен! Учитываться будет только последний ответ",
+    );
   });
 
   // Отправить мероприятия

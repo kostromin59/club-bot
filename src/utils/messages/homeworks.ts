@@ -12,9 +12,9 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
       createdAt: "desc",
     },
     where: {
-      createdAt: !isAdmin
+      answerEndDate: !isAdmin
         ? {
-            gte: new Date(),
+            gt: new Date(),
           }
         : {},
     },
@@ -22,9 +22,9 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
 
   const homeWorksCount = await prisma.homeWork.count({
     where: {
-      createdAt: !isAdmin
+      answerEndDate: !isAdmin
         ? {
-            gte: new Date(),
+            gt: new Date(),
           }
         : {},
     },

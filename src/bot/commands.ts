@@ -16,4 +16,5 @@ export const enum Commands {
   HomeWorksManage = "HomeWorksManage",
   ShowHomeWork = "ShowHomeWork",
   HomeWorksSetPage = "HomeWorksSetPage",
+  SendAnswerHomeWork = "SendAnswerHomeWork",
 }

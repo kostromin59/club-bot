@@ -19,6 +19,7 @@ export type SessionData = {
     data?: Prisma.HomeWorkCreateInput;
   };
   payersStep?: PayersSteps;
+  answerHomeWork?: number;
 };
 
 export type BotContext = Context & SessionFlavor<SessionData>;

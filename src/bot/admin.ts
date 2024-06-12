@@ -44,6 +44,7 @@ export const buildAdminBot = (
       return next();
 
     ctx.session.createHomeWork.step = CreateHomeWorkSteps.File;
+    await ctx.answerCallbackQuery("Начало создания ДЗ");
     await ctx.reply("Прикрепите файл");
   });
 
@@ -59,7 +60,7 @@ export const buildAdminBot = (
     };
     ctx.session.createHomeWork.step = CreateHomeWorkSteps.AnswerEndDate;
     await ctx.reply(
-      "Введите дату окончания приёма ответов в формате год-месяц-деньTчасы-минуты-секундыZ\nПример: 2024-06-10T12:00:00Z",
+      "Введите дату окончания приёма ответов в формате год-месяц-деньTчасы:минуты:секундыZ\nПример: 2024-06-10T12:00:00Z",
     );
   });
 
@@ -202,7 +203,7 @@ export const buildAdminBot = (
 
         ctx.session.createEvent.step = CreateEventSteps.DateStart;
         await ctx.reply(
-          "Введите дату начала в формате год-месяц-деньTчасы-минуты-секундыZ\nПример: 2024-06-10T12:00:00Z",
+          "Введите дату начала в формате год-месяц-деньTчасы:минуты:секундыZ\nПример: 2024-06-10T12:00:00Z",
         );
         return;
       case CreateEventSteps.DateStart:
