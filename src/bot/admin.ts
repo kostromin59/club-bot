@@ -1,0 +1,279 @@
+import { Api, Bot, InlineKeyboard, InputFile, RawApi } from "grammy";
+import { BotContext } from "./session";
+import {
+  Config,
+  CreateEventSteps,
+  PayersSteps,
+  getEventsMessage,
+  prisma,
+} from "../utils";
+import { Commands } from "./commands";
+import { AdminMenu, MakePayersMenu } from "./menu";
+import xlsx from "xlsx";
+import { Readable } from "node:stream";
+
+export const buildAdminBot = (
+  bot: Bot<BotContext, Api<RawApi>>,
+  config: Config,
+) => {
+  const adminBot = bot.filter((ctx) => {
+    const id = ctx.from?.id;
+    if (!id) return false;
+
+    const isAdmin = config.admins.includes(id);
+    return isAdmin;
+  });
+
+  adminBot.command("start", (ctx) => {
+    ctx.reply("Добро пожаловать!", {
+      reply_markup: AdminMenu,
+    });
+  });
+
+  adminBot.hears(Commands.Events, async (ctx) => {
+    const { message, keyboard } = await getEventsMessage(1, true);
+
+    await ctx.reply(message, {
+      reply_markup: keyboard,
+      parse_mode: "HTML",
+    });
+  });
+
+  // Изменить страницу
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.EventsSetPage))
+      return next();
+
+    const page = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!page) return;
+
+    const { message, keyboard } = await getEventsMessage(page, true);
+
+    await ctx.editMessageText(message, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    });
+  });
+
+  // Управлять мероприятием
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.EventsManage))
+      return next();
+
+    const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!eventId) return;
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+      },
+    });
+
+    if (!event) return;
+
+    const keyboard = new InlineKeyboard()
+      .text("Удалить", `${Commands.DeleteEvent}:${eventId}`)
+      .row()
+      .text("Показать участников", `${Commands.ShowUsersOnEvent}:${eventId}`);
+
+    const message = `<b>${event.name}</b> (id: ${event.id})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nКол-во участников: ${event.usersCount}\nКол-во платных участников: ${event.payersCount}\n\nВыберите действие`;
+
+    await ctx.reply(message, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    });
+
+    await ctx.answerCallbackQuery("Выберите действие");
+  });
+
+  // Удалить мероприятие
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.DeleteEvent))
+      return next();
+
+    const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!eventId) return;
+
+    await prisma.event.delete({ where: { id: eventId } });
+    await ctx.deleteMessage();
+    await ctx.answerCallbackQuery("Удалено");
+  });
+
+  // Нажатие на кнопку "Создать мероприятие"
+  adminBot.callbackQuery(Commands.CreateEvent, async (ctx) => {
+    ctx.session.createEvent.step = CreateEventSteps.Name;
+    await ctx.answerCallbackQuery("Начало создания мероприятия");
+    await ctx.reply("Введите название мероприятия");
+  });
+
+  // Создание мероприятий
+  adminBot.use(async (ctx, next) => {
+    const step = ctx.session.createEvent.step;
+    if (!step) return next();
+
+    const message = ctx.message?.text;
+    if (!message) return;
+
+    switch (step) {
+      case CreateEventSteps.Name:
+        ctx.session.createEvent.data = {
+          name: message,
+          place: "",
+          dateStart: "",
+        };
+
+        ctx.session.createEvent.step = CreateEventSteps.UsersCount;
+        await ctx.reply("Введите количество участников");
+        return;
+      case CreateEventSteps.UsersCount:
+        ctx.session.createEvent.data!.usersCount = Number.parseInt(message);
+
+        ctx.session.createEvent.step = CreateEventSteps.PayersCount;
+        await ctx.reply("Введите количество платных участников");
+        return;
+      case CreateEventSteps.PayersCount:
+        ctx.session.createEvent.data!.payersCount = Number.parseInt(message);
+
+        ctx.session.createEvent.step = CreateEventSteps.DateStart;
+        await ctx.reply(
+          "Введите дату начала в формате год-месяц-деньTчасы-минуты-секундыZ\nПример: 2024-06-10T12:00:00Z",
+        );
+        return;
+      case CreateEventSteps.DateStart:
+        ctx.session.createEvent.data!.dateStart = message;
+
+        ctx.session.createEvent.step = CreateEventSteps.Place;
+        await ctx.reply("Введите место проведения");
+        return;
+      case CreateEventSteps.Place:
+        ctx.session.createEvent.data!.place = message;
+
+        await prisma.event.create({
+          data: ctx.session.createEvent.data!,
+        });
+
+        ctx.session.createEvent = {};
+
+        await ctx.reply("Мероприятие создано!");
+        return;
+    }
+  });
+
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.ShowUsersOnEvent))
+      return next();
+
+    const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!eventId) return;
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+      },
+      include: {
+        UserEvent: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!event) return;
+
+    const workbook = xlsx.utils.book_new();
+    const worksheet = xlsx.utils.aoa_to_sheet([
+      [event.name],
+      ["ФИО", "Номер телефона", "Telegram username", "Платник"],
+      ...event.UserEvent.map(({ user }) => [
+        user.fio,
+        user.phone,
+        user.nickname,
+        user.isPayer ? "Да" : "Нет",
+      ]),
+    ]);
+
+    xlsx.utils.book_append_sheet(workbook, worksheet);
+    const buffer = xlsx.write(workbook, { type: "buffer" });
+    const stream = Readable.from(buffer);
+
+    await ctx.replyWithDocument(new InputFile(stream, `${event.name}.xlsx`));
+    await ctx.answerCallbackQuery("Вам будет отправлен файл");
+  });
+
+  adminBot.hears(Commands.Users, async (ctx) => {
+    const users = await prisma.user.findMany({
+      orderBy: {
+        fio: "asc",
+      },
+    });
+
+    const workbook = xlsx.utils.book_new();
+    const worksheet = xlsx.utils.aoa_to_sheet([
+      ["ID", "ФИО", "Номер телефона", "Telegram username", "Платник"],
+      ...users.map((user) => [
+        user.id,
+        user.fio,
+        user.phone,
+        user.nickname,
+        user.isPayer ? "Да" : "Нет",
+      ]),
+    ]);
+
+    xlsx.utils.book_append_sheet(workbook, worksheet);
+    const buffer = xlsx.write(workbook, { type: "buffer" });
+    const stream = Readable.from(buffer);
+
+    await ctx.replyWithDocument(new InputFile(stream, "Пользователи.xlsx"), {
+      reply_markup: MakePayersMenu,
+    });
+  });
+
+  // Добавить платников
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.MakePayers))
+      return next();
+
+    ctx.session.payersStep = PayersSteps.MakePayers;
+    await ctx.reply("Укажите через запятую ID пользователей");
+    await ctx.answerCallbackQuery("Укажите через запятую ID пользователей");
+  });
+
+  // Удалить платников
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.DeletePayers))
+      return next();
+
+    ctx.session.payersStep = PayersSteps.DeletePayers;
+    await ctx.reply("Укажите через запятую ID пользователей");
+    await ctx.answerCallbackQuery("Укажите через запятую ID пользователей");
+  });
+
+  // Сделать или убрать платников
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.session.payersStep) return next();
+
+    const message = ctx.message?.text;
+    if (!message) return;
+
+    const userIds = message
+      .split(",")
+      .map((uid) => uid.trim())
+      .map(parseInt)
+      .filter((n) => !isNaN(n));
+
+    await prisma.user.updateMany({
+      where: {
+        id: {
+          in: userIds,
+        },
+      },
+      data: {
+        isPayer: ctx.session.payersStep === PayersSteps.MakePayers,
+      },
+    });
+
+    ctx.session.payersStep = undefined;
+    await ctx.reply("Обновлено!");
+  });
+};
