@@ -3,6 +3,7 @@ import { BotContext } from "./session";
 import {
   Config,
   CreateEventSteps,
+  CreateHomeWorkSteps,
   PayersSteps,
   getEventsMessage,
   prisma,
@@ -11,6 +12,7 @@ import { Commands } from "./commands";
 import { AdminMenu, MakePayersMenu } from "./menu";
 import xlsx from "xlsx";
 import { Readable } from "node:stream";
+import { getHomeWorksMessage } from "../utils/messages/homeworks";
 
 export const buildAdminBot = (
   bot: Bot<BotContext, Api<RawApi>>,
@@ -30,12 +32,76 @@ export const buildAdminBot = (
     });
   });
 
+  // Домашние задания
+  adminBot.hears(Commands.HomeWorks, async (ctx) => {
+    const { message, keyboard } = await getHomeWorksMessage(1, true);
+    await ctx.reply(message, { reply_markup: keyboard, parse_mode: "HTML" });
+  });
+
+  // Создание ДЗ
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.CreateHomeWork))
+      return next();
+
+    ctx.session.createHomeWork.step = CreateHomeWorkSteps.File;
+    await ctx.reply("Прикрепите файл");
+  });
+
+  // Файл
+  adminBot.on(":file", async (ctx) => {
+    if (ctx.session.createHomeWork.step !== CreateHomeWorkSteps.File) return;
+    const file = await ctx.getFile();
+    const fileId = file.file_id;
+
+    ctx.session.createHomeWork.data = {
+      filePath: fileId,
+      answerEndDate: "",
+    };
+    ctx.session.createHomeWork.step = CreateHomeWorkSteps.AnswerEndDate;
+    await ctx.reply(
+      "Введите дату окончания приёма ответов в формате год-месяц-деньTчасы-минуты-секундыZ\nПример: 2024-06-10T12:00:00Z",
+    );
+  });
+
+  adminBot.use(async (ctx, next) => {
+    if (ctx.session.createHomeWork.step !== CreateHomeWorkSteps.AnswerEndDate)
+      return next();
+
+    const message = ctx.message?.text;
+    if (!message) return;
+
+    ctx.session.createHomeWork.data!.answerEndDate = message;
+    ctx.session.createHomeWork.step = undefined;
+
+    await prisma.homeWork.create({
+      data: ctx.session.createHomeWork.data!,
+    });
+
+    await ctx.reply("Создано!");
+  });
+
   adminBot.hears(Commands.Events, async (ctx) => {
     const { message, keyboard } = await getEventsMessage(1, true);
 
     await ctx.reply(message, {
       reply_markup: keyboard,
       parse_mode: "HTML",
+    });
+  });
+
+  // Изменить страницу для ДЗ
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeWorksSetPage))
+      return next();
+
+    const page = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!page) return;
+
+    const { message, keyboard } = await getHomeWorksMessage(page, true);
+
+    await ctx.editMessageText(message, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
     });
   });
 
@@ -76,7 +142,7 @@ export const buildAdminBot = (
       .row()
       .text("Показать участников", `${Commands.ShowUsersOnEvent}:${eventId}`);
 
-    const message = `<b>${event.name}</b> (id: ${event.id})\n${new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nКол-во участников: ${event.usersCount}\nКол-во платных участников: ${event.payersCount}\n\nВыберите действие`;
+    const message = `<b>${event.name}</b> (id: ${event.id})\n${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(event.dateStart)}\nМесто: ${event.place}\nКол-во участников: ${event.usersCount}\nКол-во платных участников: ${event.payersCount}\n\nВыберите действие`;
 
     await ctx.reply(message, {
       parse_mode: "HTML",

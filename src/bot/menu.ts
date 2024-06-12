@@ -8,6 +8,8 @@ export const SendPhoneMenu = new Keyboard()
 export const AdminMenu = new Keyboard()
   .text(Commands.Events)
   .text(Commands.Users)
+  .row()
+  .text(Commands.HomeWorks)
   .resized();
 
 export const EventsAdminMenu = () =>
@@ -21,4 +23,6 @@ export const MakePayersMenu = new InlineKeyboard()
 export const UserMenu = new Keyboard()
   .text(Commands.Events)
   .text(Commands.RegisteredEvents)
+  .row()
+  .text(Commands.HomeWorks)
   .resized();

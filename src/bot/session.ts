@@ -1,5 +1,10 @@
 import { Context, SessionFlavor } from "grammy";
-import { CreateEventSteps, PayersSteps, RegistrationSteps } from "../utils";
+import {
+  CreateEventSteps,
+  CreateHomeWorkSteps,
+  PayersSteps,
+  RegistrationSteps,
+} from "../utils";
 import type { User, Prisma } from "@prisma/client";
 
 export type SessionData = {
@@ -8,6 +13,10 @@ export type SessionData = {
   createEvent: {
     step?: CreateEventSteps;
     data?: Prisma.EventCreateInput;
+  };
+  createHomeWork: {
+    step?: CreateHomeWorkSteps;
+    data?: Prisma.HomeWorkCreateInput;
   };
   payersStep?: PayersSteps;
 };

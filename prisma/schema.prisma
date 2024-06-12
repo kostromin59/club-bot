@@ -14,22 +14,23 @@ datasource db {
 }
 
 model User {
-  id        BigInt      @id @unique
-  nickname  String
-  fio       String?
-  phone     String?
-  UserEvent UserEvent[]
-  isPayer   Boolean     @default(false)
+  id              BigInt           @id @unique
+  nickname        String
+  fio             String?
+  phone           String?
+  UserEvent       UserEvent[]
+  isPayer         Boolean          @default(false)
+  HomeWorkAnswers HomeWorkAnswer[]
 }
 
 model Event {
-  id         Int         @id @default(autoincrement())
-  name       String
-  dateStart  DateTime
-  place      String
-  usersCount Int?
+  id          Int         @id @default(autoincrement())
+  name        String
+  dateStart   DateTime
+  place       String
+  usersCount  Int?
   payersCount Int?
-  UserEvent  UserEvent[]
+  UserEvent   UserEvent[]
 }
 
 model UserEvent {
@@ -38,4 +39,22 @@ model UserEvent {
   eventId Int
   user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model HomeWork {
+  id             Int              @id @default(autoincrement())
+  filePath       String
+  createdAt      DateTime         @default(now())
+  answerEndDate  DateTime
+  HomeWorkAnswer HomeWorkAnswer[]
+}
+
+model HomeWorkAnswer {
+  id         Int      @id @default(autoincrement())
+  filePath   String?
+  link       String?
+  homeWorkId Int
+  homeWork   HomeWork @relation(fields: [homeWorkId], references: [id], onDelete: Cascade)
+  userId     BigInt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

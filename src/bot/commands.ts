@@ -11,4 +11,9 @@ export const enum Commands {
   Users = "Пользователи",
   MakePayers = "Добавить платников",
   DeletePayers = "Удалить платников",
+  HomeWorks = "Домашние задания",
+  CreateHomeWork = "Создать ДЗ",
+  HomeWorksManage = "HomeWorksManage",
+  ShowHomeWork = "ShowHomeWork",
+  HomeWorksSetPage = "HomeWorksSetPage",
 }

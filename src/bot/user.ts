@@ -10,6 +10,7 @@ import {
 } from "../utils";
 import { SendPhoneMenu, UserMenu } from "./menu";
 import { Commands } from "./commands";
+import { getHomeWorksMessage } from "../utils/messages/homeworks";
 
 export const buildUserBot = (
   bot: Bot<BotContext, Api<RawApi>>,
@@ -144,6 +145,11 @@ export const buildUserBot = (
     });
   });
 
+  userBot.hears(Commands.HomeWorks, async (ctx) => {
+    const { message, keyboard } = await getHomeWorksMessage();
+    await ctx.reply(message, { reply_markup: keyboard, parse_mode: "HTML" });
+  });
+
   // Отправить мероприятия
   userBot.hears(Commands.Events, async (ctx) => {
     const { message, keyboard } = await getEventsMessage();
@@ -151,6 +157,22 @@ export const buildUserBot = (
     await ctx.reply(message, {
       reply_markup: keyboard,
       parse_mode: "HTML",
+    });
+  });
+
+  // Изменить страницу для ДЗ
+  userBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeWorksSetPage))
+      return next();
+
+    const page = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!page) return;
+
+    const { message, keyboard } = await getHomeWorksMessage(page);
+
+    await ctx.editMessageText(message, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
     });
   });
 
