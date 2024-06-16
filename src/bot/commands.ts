@@ -17,4 +17,6 @@ export const enum Commands {
   ShowHomeWork = "ShowHomeWork",
   HomeWorksSetPage = "HomeWorksSetPage",
   SendAnswerHomeWork = "SendAnswerHomeWork",
+  LinkTypeHomeWork = "Только ссылки",
+  FileTypeHomeWork = "Только файлы",
 }

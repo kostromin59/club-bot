@@ -26,3 +26,9 @@ export const UserMenu = new Keyboard()
   .row()
   .text(Commands.HomeWorks)
   .resized();
+
+export const HomeWorkTypeMenu = (id: number) =>
+  new InlineKeyboard()
+    .text(Commands.LinkTypeHomeWork, `${Commands.LinkTypeHomeWork}:${id}`)
+    .row()
+    .text(Commands.FileTypeHomeWork, `${Commands.FileTypeHomeWork}:${id}`);

@@ -2,7 +2,7 @@ import { InlineKeyboard } from "grammy";
 import { prisma } from "../prisma";
 import { Commands } from "../../bot";
 
-const pageSize = 1;
+const pageSize = 5;
 
 export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
   const homeWorks = await prisma.homeWork.findMany({
@@ -78,7 +78,7 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
     return acc;
   }, "");
 
-  const message = `Список домашних заданий (Кнопками выберите задание)${homeWorksMessage}Страница ${page} из ${pagesCount}`;
+  const message = `Список домашних заданий (Кнопками выберите задание)\n${homeWorksMessage}Страница ${page} из ${pagesCount}`;
 
   return { message, keyboard };
 };

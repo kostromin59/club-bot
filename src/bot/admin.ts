@@ -9,7 +9,7 @@ import {
   prisma,
 } from "../utils";
 import { Commands } from "./commands";
-import { AdminMenu, MakePayersMenu } from "./menu";
+import { AdminMenu, HomeWorkTypeMenu, MakePayersMenu } from "./menu";
 import xlsx from "xlsx";
 import { Readable } from "node:stream";
 import { getHomeWorksMessage } from "../utils/messages/homeworks";
@@ -48,14 +48,132 @@ export const buildAdminBot = (
     await ctx.reply("Прикрепите файл");
   });
 
+  // Управление ДЗ
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeWorksManage))
+      return next();
+
+    const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!id) return;
+
+    const homeWork = await prisma.homeWork.findFirst({
+      where: { id },
+    });
+
+    if (!homeWork) return await ctx.answerCallbackQuery("Не найдено");
+
+    await ctx.reply("Выберите тип:", { reply_markup: HomeWorkTypeMenu(id) });
+    await ctx.answerCallbackQuery("Выберите тип");
+  });
+
+  // Только ссылки
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.LinkTypeHomeWork))
+      return next();
+
+    const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!id) return;
+
+    const homeWork = await prisma.homeWork.findFirst({
+      where: { id },
+      include: {
+        HomeWorkAnswer: {
+          where: { link: { not: null } },
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!homeWork) return await ctx.answerCallbackQuery("Не найдено");
+
+    const workbook = xlsx.utils.book_new();
+    const worksheet = xlsx.utils.aoa_to_sheet([
+      ["ФИО", "Telegram username", "Ссылка"],
+      ...homeWork.HomeWorkAnswer.map(({ user, link }) => [
+        user.fio,
+        user.nickname,
+        link,
+      ]),
+    ]);
+
+    xlsx.utils.book_append_sheet(workbook, worksheet);
+    const buffer = xlsx.write(workbook, { type: "buffer" });
+    const stream = Readable.from(buffer);
+
+    await ctx.replyWithDocument(
+      new InputFile(
+        stream,
+        `Ссылки ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}.xlsx`,
+      ),
+    );
+    await ctx.answerCallbackQuery("Файл отправлен");
+  });
+
+  // Только файлы
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.FileTypeHomeWork))
+      return next();
+
+    const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!id) return;
+
+    const homeWork = await prisma.homeWork.findFirst({
+      where: { id },
+      include: {
+        HomeWorkAnswer: {
+          where: { filePath: { not: null } },
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!homeWork) return await ctx.answerCallbackQuery("Не найдено");
+
+    const answers: [string, string, string][] = [];
+
+    for await (const answer of homeWork.HomeWorkAnswer) {
+      if (!answer.filePath || !answer.user.fio) continue;
+
+      const file = await ctx.api.getFile(answer.filePath);
+
+      answers.push([
+        answer.user.fio,
+        answer.user.nickname,
+        `https://api.telegram.org/file/bot${config.token}/${file.file_path}`,
+      ]);
+    }
+
+    const workbook = xlsx.utils.book_new();
+    const worksheet = xlsx.utils.aoa_to_sheet([
+      ["ФИО", "Telegram username", "Ссылка на файл"],
+      ...answers,
+    ]);
+
+    xlsx.utils.book_append_sheet(workbook, worksheet);
+    const buffer = xlsx.write(workbook, { type: "buffer" });
+    const stream = Readable.from(buffer);
+
+    await ctx.replyWithDocument(
+      new InputFile(
+        stream,
+        `Файлы ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}.xlsx`,
+      ),
+    );
+    await ctx.answerCallbackQuery("Файл отправлен");
+  });
+
   // Файл
   adminBot.on(":file", async (ctx) => {
     if (ctx.session.createHomeWork.step !== CreateHomeWorkSteps.File) return;
     const file = await ctx.getFile();
-    const fileId = file.file_id;
+    const filePath = file.file_id;
 
     ctx.session.createHomeWork.data = {
-      filePath: fileId,
+      filePath,
       answerEndDate: "",
     };
     ctx.session.createHomeWork.step = CreateHomeWorkSteps.AnswerEndDate;
