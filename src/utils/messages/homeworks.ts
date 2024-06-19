@@ -14,8 +14,8 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
     where: {
       answerEndDate: !isAdmin
         ? {
-            gt: new Date(),
-          }
+          gt: new Date(),
+        }
         : {},
     },
   });
@@ -24,8 +24,8 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
     where: {
       answerEndDate: !isAdmin
         ? {
-            gt: new Date(),
-          }
+          gt: new Date(),
+        }
         : {},
     },
   });
@@ -38,7 +38,7 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
     homeWorks.forEach((homeWork, index) => {
       keyboard
         .text(
-          `Управлять ${index + 1}`,
+          `Управлять ${index + 1} (#${homeWork.id})`,
           `${Commands.HomeWorksManage}:${homeWork.id}`,
         )
         .row();
@@ -47,7 +47,7 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
     homeWorks.forEach((homeWork, index) => {
       keyboard
         .text(
-          `Посмотреть #${index + 1}`,
+          `Посмотреть #${index + 1} (#${homeWork.id})`,
           `${Commands.ShowHomeWork}:${homeWork.id}`,
         )
         .row();
@@ -74,7 +74,7 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
   }
 
   const homeWorksMessage = homeWorks.reduce((acc, homeWork, index) => {
-    acc += `<b>Задание от ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}</b> (#${index + 1})\nОтветы принимаются до ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(homeWork.answerEndDate)}\n\n`;
+    acc += `<b>#${index + 1} Задание от ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}</b> (#${homeWork.id})\nОтветы принимаются до ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(homeWork.answerEndDate)}\n\n`;
     return acc;
   }, "");
 

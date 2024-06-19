@@ -93,7 +93,7 @@ export const buildAdminBot = (
       ["ФИО", "Telegram username", "Ссылка"],
       ...homeWork.HomeWorkAnswer.map(({ user, link }) => [
         user.fio,
-        user.nickname,
+        `https://t.me/${user.nickname}?text=${encodeURIComponent(`#${homeWork.id} Homework ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}`)}.\n\n`,
         link,
       ]),
     ]);
@@ -142,7 +142,7 @@ export const buildAdminBot = (
 
       answers.push([
         answer.user.fio,
-        answer.user.nickname,
+        `https://t.me/${answer.user.nickname}?text=${encodeURIComponent(`#${homeWork.id} Homework ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}`)}.\n\n`,
         `https://api.telegram.org/file/bot${config.token}/${file.file_path}`,
       ]);
     }
@@ -160,7 +160,7 @@ export const buildAdminBot = (
     await ctx.replyWithDocument(
       new InputFile(
         stream,
-        `Файлы ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}.xlsx`,
+        `(#${homeWork.id}) Файлы ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}.xlsx`,
       ),
     );
     await ctx.answerCallbackQuery("Файл отправлен");
