@@ -29,7 +29,7 @@ bot.catch((err) => {
   }
 });
 
-bot.use(session({ initial: () => ({ createEvent: {}, createHomeWork: {} }) }));
+bot.use(session({ initial: () => ({ createEvent: {}, createHomework: {} }) }));
 
 buildAdminBot(bot, config);
 buildUserBot(bot, config);

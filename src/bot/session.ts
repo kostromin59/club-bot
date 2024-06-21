@@ -1,7 +1,7 @@
 import { Context, SessionFlavor } from "grammy";
 import {
   CreateEventSteps,
-  CreateHomeWorkSteps,
+  CreateHomeworkSteps,
   PayersSteps,
   RegistrationSteps,
 } from "../utils";
@@ -14,12 +14,12 @@ export type SessionData = {
     step?: CreateEventSteps;
     data?: Prisma.EventCreateInput;
   };
-  createHomeWork: {
-    step?: CreateHomeWorkSteps;
-    data?: Prisma.HomeWorkCreateInput;
+  createHomework: {
+    step?: CreateHomeworkSteps;
+    data?: Prisma.HomeworkCreateInput;
   };
   payersStep?: PayersSteps;
-  answerHomeWork?: number;
+  answerHomework?: number;
 };
 
 export type BotContext = Context & SessionFlavor<SessionData>;

@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "HomeWorkAnswer" ADD COLUMN     "fileId" TEXT;
+ALTER TABLE "HomeworkAnswer" ADD COLUMN     "fileId" TEXT;

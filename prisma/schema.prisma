@@ -20,7 +20,7 @@ model User {
   phone           String?
   UserEvent       UserEvent[]
   isPayer         Boolean          @default(false)
-  HomeWorkAnswers HomeWorkAnswer[]
+  HomeworkAnswers HomeworkAnswer[]
 }
 
 model Event {
@@ -41,21 +41,21 @@ model UserEvent {
   event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
 
-model HomeWork {
+model Homework {
   id             Int              @id @default(autoincrement())
   filePath       String?
   text           String?
   createdAt      DateTime         @default(now())
   answerEndDate  DateTime
-  HomeWorkAnswer HomeWorkAnswer[]
+  HomeworkAnswer HomeworkAnswer[]
 }
 
-model HomeWorkAnswer {
+model HomeworkAnswer {
   id         Int      @id @default(autoincrement())
   filePath   String?
   link       String?
-  homeWorkId Int
-  homeWork   HomeWork @relation(fields: [homeWorkId], references: [id], onDelete: Cascade)
+  homeworkId Int
+  homework   Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
   userId     BigInt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

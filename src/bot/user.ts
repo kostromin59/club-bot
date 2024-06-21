@@ -10,7 +10,7 @@ import {
 } from "../utils";
 import { SendPhoneMenu, UserMenu } from "./menu";
 import { Commands } from "./commands";
-import { getHomeWorksMessage } from "../utils/messages/homeworks";
+import { getHomeworksMessage } from "../utils/messages/homeworks";
 
 export const buildUserBot = (
   bot: Bot<BotContext, Api<RawApi>>,
@@ -145,19 +145,19 @@ export const buildUserBot = (
     });
   });
 
-  userBot.hears(Commands.HomeWorks, async (ctx) => {
-    const { message, keyboard } = await getHomeWorksMessage();
+  userBot.hears(Commands.Homeworks, async (ctx) => {
+    const { message, keyboard } = await getHomeworksMessage();
     await ctx.reply(message, { reply_markup: keyboard, parse_mode: "HTML" });
   });
 
   userBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.ShowHomeWork))
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.ShowHomework))
       return next();
 
     const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!id) return;
 
-    const homeWork = await prisma.homeWork.findFirst({
+    const homework = await prisma.homework.findFirst({
       where: {
         id,
         answerEndDate: {
@@ -166,42 +166,42 @@ export const buildUserBot = (
       },
     });
 
-    if (!homeWork) return;
+    if (!homework) return;
 
     const date = Intl.DateTimeFormat("ru-RU", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       timeZone: "UTC",
-    }).format(homeWork.createdAt);
+    }).format(homework.createdAt);
 
     const keyboard = new InlineKeyboard().text(
       `Выполнить (${date})`,
-      `${Commands.SendAnswerHomeWork}:${homeWork.id}`,
+      `${Commands.SendAnswerHomework}:${homework.id}`,
     );
 
-    if (homeWork.text) {
-      await ctx.reply(homeWork.text, { reply_markup: keyboard });
-    } else if (homeWork.filePath) {
-      await ctx.replyWithDocument(homeWork.filePath, { reply_markup: keyboard });
+    if (homework.text) {
+      await ctx.reply(homework.text, { reply_markup: keyboard });
+    } else if (homework.filePath) {
+      await ctx.replyWithDocument(homework.filePath, { reply_markup: keyboard });
     }
     await ctx.answerCallbackQuery(`Задание от ${date}`);
   });
 
   // Отправка ответа на ДЗ
   userBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.SendAnswerHomeWork))
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.SendAnswerHomework))
       return next();
 
     const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!id) return;
 
-    ctx.session.answerHomeWork = id;
+    ctx.session.answerHomework = id;
     await ctx.reply("Отправьте файл или ссылку");
   });
 
   userBot.on(":file", async (ctx) => {
-    const id = ctx.session.answerHomeWork;
+    const id = ctx.session.answerHomework;
     if (!id) return;
 
     const userId = ctx.session.user?.id;
@@ -209,23 +209,23 @@ export const buildUserBot = (
 
     const file = await ctx.getFile();
 
-    const answer = await prisma.homeWorkAnswer.findFirst({
+    const answer = await prisma.homeworkAnswer.findFirst({
       where: {
-        homeWorkId: id,
+        homeworkId: id,
         userId,
       },
     });
 
-    await prisma.homeWorkAnswer.upsert({
+    await prisma.homeworkAnswer.upsert({
       create: {
         userId,
-        homeWorkId: id,
+        homeworkId: id,
         filePath: file.file_id,
       },
       where: {
         id: answer?.id ?? 0,
         userId,
-        homeWorkId: id,
+        homeworkId: id,
       },
       update: {
         filePath: file.file_id,
@@ -233,7 +233,7 @@ export const buildUserBot = (
       },
     });
 
-    ctx.session.answerHomeWork = undefined;
+    ctx.session.answerHomework = undefined;
 
     await ctx.reply(
       "Ответ отправлен! Учитываться будет только последний ответ",
@@ -241,7 +241,7 @@ export const buildUserBot = (
   });
 
   userBot.on("msg::url", async (ctx) => {
-    const id = ctx.session.answerHomeWork;
+    const id = ctx.session.answerHomework;
     if (!id) return;
 
     const userId = ctx.session.user?.id;
@@ -250,23 +250,23 @@ export const buildUserBot = (
     const message = ctx.message?.text;
     if (!message) return;
 
-    const answer = await prisma.homeWorkAnswer.findFirst({
+    const answer = await prisma.homeworkAnswer.findFirst({
       where: {
-        homeWorkId: id,
+        homeworkId: id,
         userId,
       },
     });
 
-    await prisma.homeWorkAnswer.upsert({
+    await prisma.homeworkAnswer.upsert({
       create: {
         userId,
-        homeWorkId: id,
+        homeworkId: id,
         link: message,
       },
       where: {
         id: answer?.id ?? 0,
         userId,
-        homeWorkId: id,
+        homeworkId: id,
       },
       update: {
         filePath: null,
@@ -274,7 +274,7 @@ export const buildUserBot = (
       },
     });
 
-    ctx.session.answerHomeWork = undefined;
+    ctx.session.answerHomework = undefined;
 
     await ctx.reply(
       "Ответ отправлен! Учитываться будет только последний ответ",
@@ -293,13 +293,13 @@ export const buildUserBot = (
 
   // Изменить страницу для ДЗ
   userBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeWorksSetPage))
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeworksSetPage))
       return next();
 
     const page = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!page) return;
 
-    const { message, keyboard } = await getHomeWorksMessage(page);
+    const { message, keyboard } = await getHomeworksMessage(page);
 
     await ctx.editMessageText(message, {
       parse_mode: "HTML",

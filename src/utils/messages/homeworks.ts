@@ -4,8 +4,8 @@ import { Commands } from "../../bot";
 
 const pageSize = 5;
 
-export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
-  const homeWorks = await prisma.homeWork.findMany({
+export const getHomeworksMessage = async (page = 1, isAdmin = false) => {
+  const homeworks = await prisma.homework.findMany({
     take: pageSize,
     skip: (page - 1) * pageSize,
     orderBy: {
@@ -20,7 +20,7 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
     },
   });
 
-  const homeWorksCount = await prisma.homeWork.count({
+  const homeworksCount = await prisma.homework.count({
     where: {
       answerEndDate: !isAdmin
         ? {
@@ -29,56 +29,56 @@ export const getHomeWorksMessage = async (page = 1, isAdmin = false) => {
         : {},
     },
   });
-  const pagesCount = Math.ceil(homeWorksCount / pageSize);
+  const pagesCount = Math.ceil(homeworksCount / pageSize);
 
   const keyboard = new InlineKeyboard();
   if (isAdmin) {
-    keyboard.text(Commands.CreateHomeWork, Commands.CreateHomeWork).row();
+    keyboard.text(Commands.CreateHomework, Commands.CreateHomework).row();
 
-    homeWorks.forEach((homeWork, index) => {
+    homeworks.forEach((homework, index) => {
       keyboard
         .text(
-          `Управлять ${index + 1} (#${homeWork.id})`,
-          `${Commands.HomeWorksManage}:${homeWork.id}`,
+          `Управлять ${index + 1} (#${homework.id})`,
+          `${Commands.HomeworksManage}:${homework.id}`,
         )
         .row();
     });
   } else {
-    homeWorks.forEach((homeWork, index) => {
+    homeworks.forEach((homework, index) => {
       keyboard
         .text(
-          `Посмотреть #${index + 1} (#${homeWork.id})`,
-          `${Commands.ShowHomeWork}:${homeWork.id}`,
+          `Посмотреть #${index + 1} (#${homework.id})`,
+          `${Commands.ShowHomework}:${homework.id}`,
         )
         .row();
     });
   }
 
   if (page === 1 && pagesCount > 1) {
-    keyboard.text("Следующая страница", `${Commands.HomeWorksSetPage}:2`);
+    keyboard.text("Следующая страница", `${Commands.HomeworksSetPage}:2`);
   } else if (page === pagesCount && page !== 1) {
     keyboard.text(
       "Предыдущая страница",
-      `${Commands.HomeWorksSetPage}:${page - 1}`,
+      `${Commands.HomeworksSetPage}:${page - 1}`,
     );
   } else if (pagesCount > 1) {
-    keyboard.text("<", `${Commands.HomeWorksSetPage}:${page - 1}`);
-    keyboard.text("первая", `${Commands.HomeWorksSetPage}:1`);
-    keyboard.text("последняя", `${Commands.HomeWorksSetPage}:${pagesCount}`);
-    keyboard.text(">", `${Commands.HomeWorksSetPage}:${page + 1}`);
+    keyboard.text("<", `${Commands.HomeworksSetPage}:${page - 1}`);
+    keyboard.text("первая", `${Commands.HomeworksSetPage}:1`);
+    keyboard.text("последняя", `${Commands.HomeworksSetPage}:${pagesCount}`);
+    keyboard.text(">", `${Commands.HomeworksSetPage}:${page + 1}`);
   }
 
-  if (!homeWorks.length) {
+  if (!homeworks.length) {
     const message = "Домашних заданий ещё нет!";
     return { message, keyboard };
   }
 
-  const homeWorksMessage = homeWorks.reduce((acc, homeWork, index) => {
-    acc += `<b>#${index + 1} Задание от ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}</b> (#${homeWork.id})\nОтветы принимаются до ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(homeWork.answerEndDate)}\n\n`;
+  const homeworksMessage = homeworks.reduce((acc, homework, index) => {
+    acc += `<b>#${index + 1} Задание от ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homework.createdAt)}</b> (#${homework.id})\nОтветы принимаются до ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(homework.answerEndDate)}\n\n`;
     return acc;
   }, "");
 
-  const message = `Список домашних заданий (Кнопками выберите задание)\n${homeWorksMessage}Страница ${page} из ${pagesCount}`;
+  const message = `Список домашних заданий (Кнопками выберите задание)\n${homeworksMessage}Страница ${page} из ${pagesCount}`;
 
   return { message, keyboard };
 };

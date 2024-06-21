@@ -1,4 +1,4 @@
-export const enum CreateHomeWorkSteps {
+export const enum CreateHomeworkSteps {
   File = "File",
   AnswerEndDate = "AnswerEndDate",
 }

@@ -1,8 +1,8 @@
 /*
   Warnings:
 
-  - You are about to drop the column `fileId` on the `HomeWorkAnswer` table. All the data in the column will be lost.
+  - You are about to drop the column `fileId` on the `HomeworkAnswer` table. All the data in the column will be lost.
 
 */
 -- AlterTable
-ALTER TABLE "HomeWorkAnswer" DROP COLUMN "fileId";
+ALTER TABLE "HomeworkAnswer" DROP COLUMN "fileId";

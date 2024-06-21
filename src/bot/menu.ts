@@ -9,7 +9,7 @@ export const AdminMenu = new Keyboard()
   .text(Commands.Events)
   .text(Commands.Users)
   .row()
-  .text(Commands.HomeWorks)
+  .text(Commands.Homeworks)
   .resized();
 
 export const EventsAdminMenu = () =>
@@ -24,11 +24,13 @@ export const UserMenu = new Keyboard()
   .text(Commands.Events)
   .text(Commands.RegisteredEvents)
   .row()
-  .text(Commands.HomeWorks)
+  .text(Commands.Homeworks)
   .resized();
 
-export const HomeWorkTypeMenu = (id: number) =>
+export const HomeworkTypeMenu = (id: number) =>
   new InlineKeyboard()
-    .text(Commands.LinkTypeHomeWork, `${Commands.LinkTypeHomeWork}:${id}`)
+    .text(Commands.DeleteHomework, `${Commands.DeleteHomework}:${id}`)
     .row()
-    .text(Commands.FileTypeHomeWork, `${Commands.FileTypeHomeWork}:${id}`);
+    .text(Commands.LinkTypeHomework, `${Commands.LinkTypeHomework}:${id}`)
+    .row()
+    .text(Commands.FileTypeHomework, `${Commands.FileTypeHomework}:${id}`);

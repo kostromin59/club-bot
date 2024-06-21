@@ -3,16 +3,16 @@ import { BotContext } from "./session";
 import {
   Config,
   CreateEventSteps,
-  CreateHomeWorkSteps,
+  CreateHomeworkSteps,
   PayersSteps,
   getEventsMessage,
   prisma,
 } from "../utils";
 import { Commands } from "./commands";
-import { AdminMenu, HomeWorkTypeMenu, MakePayersMenu } from "./menu";
+import { AdminMenu, HomeworkTypeMenu, MakePayersMenu } from "./menu";
 import xlsx from "xlsx";
 import { Readable } from "node:stream";
-import { getHomeWorksMessage } from "../utils/messages/homeworks";
+import { getHomeworksMessage } from "../utils/messages/homeworks";
 
 export const buildAdminBot = (
   bot: Bot<BotContext, Api<RawApi>>,
@@ -33,33 +33,33 @@ export const buildAdminBot = (
   });
 
   // Домашние задания
-  adminBot.hears(Commands.HomeWorks, async (ctx) => {
-    const { message, keyboard } = await getHomeWorksMessage(1, true);
+  adminBot.hears(Commands.Homeworks, async (ctx) => {
+    const { message, keyboard } = await getHomeworksMessage(1, true);
     await ctx.reply(message, { reply_markup: keyboard, parse_mode: "HTML" });
   });
 
   // Создание ДЗ
   adminBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.CreateHomeWork))
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.CreateHomework))
       return next();
 
-    ctx.session.createHomeWork.step = CreateHomeWorkSteps.File;
+    ctx.session.createHomework.step = CreateHomeworkSteps.File;
     await ctx.answerCallbackQuery("Начало создания ДЗ");
     await ctx.reply("Прикрепите файл или напишите текст");
   });
 
   adminBot.use(async (ctx, next) => {
-    if (ctx.session.createHomeWork.step !== CreateHomeWorkSteps.File) return next();
+    if (ctx.session.createHomework.step !== CreateHomeworkSteps.File) return next();
 
     const message = ctx.message?.text;
     if (!message) return;
 
-    ctx.session.createHomeWork.data = {
+    ctx.session.createHomework.data = {
       answerEndDate: "",
       text: message,
     };
 
-    ctx.session.createHomeWork.step = CreateHomeWorkSteps.AnswerEndDate;
+    ctx.session.createHomework.step = CreateHomeworkSteps.AnswerEndDate;
     await ctx.reply(
       "Введите дату окончания приёма ответов в формате год-месяц-деньTчасы:минуты:секундыZ\nПример: 2024-06-10T12:00:00Z",
     );
@@ -67,39 +67,63 @@ export const buildAdminBot = (
 
   // Управление ДЗ
   adminBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeWorksManage))
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeworksManage))
       return next();
 
     const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!id) return;
 
-    const homeWork = await prisma.homeWork.findFirst({
+    const homework = await prisma.homework.findFirst({
       where: { id },
     });
 
-    if (!homeWork) return await ctx.answerCallbackQuery("Не найдено");
+    if (!homework) return await ctx.answerCallbackQuery("Не найдено");
 
-    if (homeWork.text) {
-      await ctx.reply(`${homeWork.text}\n\nВыберите тип:`, { reply_markup: HomeWorkTypeMenu(id) });
-    } else if (homeWork.filePath) {
-      await ctx.replyWithDocument(homeWork.filePath, { reply_markup: HomeWorkTypeMenu(id) })
+    if (homework.text) {
+      await ctx.reply(`${homework.text}\n\nВыберите тип:`, { reply_markup: HomeworkTypeMenu(id) });
+    } else if (homework.filePath) {
+      await ctx.replyWithDocument(homework.filePath, { reply_markup: HomeworkTypeMenu(id) })
     }
 
     await ctx.answerCallbackQuery("Выберите тип");
   });
 
-  // Только ссылки
+  // Удаление ДЗ
   adminBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.LinkTypeHomeWork))
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.DeleteHomework))
       return next();
 
     const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!id) return;
 
-    const homeWork = await prisma.homeWork.findFirst({
+    const homework = await prisma.homework.findFirst({
+      where: { id },
+    });
+
+    if (!homework) return await ctx.answerCallbackQuery("Не найдено");
+
+    await prisma.homework.delete({
+      where: {
+        id
+      }
+    });
+
+    await ctx.deleteMessage();
+    await ctx.answerCallbackQuery("Удалено");
+  });
+
+  // Только ссылки
+  adminBot.use(async (ctx, next) => {
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.LinkTypeHomework))
+      return next();
+
+    const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
+    if (!id) return;
+
+    const homework = await prisma.homework.findFirst({
       where: { id },
       include: {
-        HomeWorkAnswer: {
+        HomeworkAnswer: {
           where: { link: { not: null } },
           include: {
             user: true,
@@ -108,15 +132,15 @@ export const buildAdminBot = (
       },
     });
 
-    if (!homeWork) return await ctx.answerCallbackQuery("Не найдено");
+    if (!homework) return await ctx.answerCallbackQuery("Не найдено");
 
     const workbook = xlsx.utils.book_new();
     const worksheet = xlsx.utils.aoa_to_sheet([
       ["ФИО", "Номер телефона", "Telegram username", "Ссылка"],
-      ...homeWork.HomeWorkAnswer.map(({ user, link }) => [
+      ...homework.HomeworkAnswer.map(({ user, link }) => [
         user.fio,
         user.phone,
-        `https://t.me/${user.nickname}?text=${encodeURIComponent(`#${homeWork.id} Homework ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}`)}.\n\n`,
+        `https://t.me/${user.nickname}?text=${encodeURIComponent(`#${homework.id} Homework ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homework.createdAt)}`)}.\n\n`,
         link,
       ]),
     ]);
@@ -128,7 +152,7 @@ export const buildAdminBot = (
     await ctx.replyWithDocument(
       new InputFile(
         stream,
-        `(#${homeWork.id}) Ссылки ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}.xlsx`,
+        `(#${homework.id}) Ссылки ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homework.createdAt)}.xlsx`,
       ),
     );
     await ctx.answerCallbackQuery("Файл отправлен");
@@ -136,16 +160,16 @@ export const buildAdminBot = (
 
   // Только файлы
   adminBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.FileTypeHomeWork))
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.FileTypeHomework))
       return next();
 
     const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!id) return;
 
-    const homeWork = await prisma.homeWork.findFirst({
+    const homework = await prisma.homework.findFirst({
       where: { id },
       include: {
-        HomeWorkAnswer: {
+        HomeworkAnswer: {
           where: { filePath: { not: null } },
           include: {
             user: true,
@@ -154,11 +178,11 @@ export const buildAdminBot = (
       },
     });
 
-    if (!homeWork) return await ctx.answerCallbackQuery("Не найдено");
+    if (!homework) return await ctx.answerCallbackQuery("Не найдено");
 
     const answers: [string, string, string, string][] = [];
 
-    for await (const answer of homeWork.HomeWorkAnswer) {
+    for await (const answer of homework.HomeworkAnswer) {
       if (!answer.filePath || !answer.user.fio) continue;
 
       const file = await ctx.api.getFile(answer.filePath);
@@ -166,7 +190,7 @@ export const buildAdminBot = (
       answers.push([
         answer.user.fio,
         answer.user.phone || "",
-        `https://t.me/${answer.user.nickname}?text=${encodeURIComponent(`#${homeWork.id} Homework ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}`)}.\n\n`,
+        `https://t.me/${answer.user.nickname}?text=${encodeURIComponent(`#${homework.id} Homework ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homework.createdAt)}`)}.\n\n`,
         `https://api.telegram.org/file/bot${config.token}/${file.file_path}`,
       ]);
     }
@@ -184,7 +208,7 @@ export const buildAdminBot = (
     await ctx.replyWithDocument(
       new InputFile(
         stream,
-        `(#${homeWork.id}) Файлы ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}.xlsx`,
+        `(#${homework.id}) Файлы ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homework.createdAt)}.xlsx`,
       ),
     );
     await ctx.answerCallbackQuery("Файл отправлен");
@@ -192,33 +216,32 @@ export const buildAdminBot = (
 
   // Файл
   adminBot.on(":file", async (ctx) => {
-    if (ctx.session.createHomeWork.step !== CreateHomeWorkSteps.File) return;
+    if (ctx.session.createHomework.step !== CreateHomeworkSteps.File) return;
     const file = await ctx.getFile();
     const filePath = file.file_id;
 
-    ctx.session.createHomeWork.data = {
+    ctx.session.createHomework.data = {
       filePath,
       answerEndDate: "",
     };
-    ctx.session.createHomeWork.step = CreateHomeWorkSteps.AnswerEndDate;
+    ctx.session.createHomework.step = CreateHomeworkSteps.AnswerEndDate;
     await ctx.reply(
       "Введите дату окончания приёма ответов в формате год-месяц-деньTчасы:минуты:секундыZ\nПример: 2024-06-10T12:00:00Z",
     );
   });
 
   adminBot.use(async (ctx, next) => {
-    if (ctx.session.createHomeWork.step !== CreateHomeWorkSteps.AnswerEndDate)
+    if (ctx.session.createHomework.step !== CreateHomeworkSteps.AnswerEndDate)
       return next();
 
-    console.log("fffff")
     const message = ctx.message?.text;
     if (!message) return;
 
-    ctx.session.createHomeWork.data!.answerEndDate = message;
-    ctx.session.createHomeWork.step = undefined;
+    ctx.session.createHomework.data!.answerEndDate = message;
+    ctx.session.createHomework.step = undefined;
 
-    await prisma.homeWork.create({
-      data: ctx.session.createHomeWork.data!,
+    await prisma.homework.create({
+      data: ctx.session.createHomework.data!,
     });
 
     await ctx.reply("Создано!");
@@ -235,13 +258,13 @@ export const buildAdminBot = (
 
   // Изменить страницу для ДЗ
   adminBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeWorksSetPage))
+    if (!ctx.callbackQuery?.data?.startsWith(Commands.HomeworksSetPage))
       return next();
 
     const page = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!page) return;
 
-    const { message, keyboard } = await getHomeWorksMessage(page, true);
+    const { message, keyboard } = await getHomeworksMessage(page, true);
 
     await ctx.editMessageText(message, {
       parse_mode: "HTML",
