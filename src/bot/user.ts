@@ -196,6 +196,17 @@ export const buildUserBot = (
     const id = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!id) return;
 
+    const event = await prisma.event.findFirst({
+      where: {
+        id,
+        dateStart: {
+          gt: new Date()
+        }
+      },
+    });
+
+    if (!event) return;
+
     ctx.session.answerHomework = id;
     await ctx.reply("Отправьте файл или ссылку");
   });
@@ -206,6 +217,17 @@ export const buildUserBot = (
 
     const userId = ctx.session.user?.id;
     if (!userId) return;
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id,
+        dateStart: {
+          gt: new Date()
+        }
+      },
+    });
+
+    if (!event) return;
 
     const file = await ctx.getFile();
 
@@ -249,6 +271,17 @@ export const buildUserBot = (
 
     const message = ctx.message?.text;
     if (!message) return;
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id,
+        dateStart: {
+          gt: new Date()
+        }
+      },
+    });
+
+    if (!event) return;
 
     const answer = await prisma.homeworkAnswer.findFirst({
       where: {
@@ -346,6 +379,9 @@ export const buildUserBot = (
     const event = await prisma.event.findFirst({
       where: {
         id: eventId,
+        dateStart: {
+          gt: new Date()
+        }
       },
       select: {
         usersCount: true,
@@ -397,6 +433,17 @@ export const buildUserBot = (
 
     const eventId = parseInt(ctx.callbackQuery.data.split(":")[1]);
     if (!eventId) return;
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id: eventId,
+        dateStart: {
+          gt: new Date()
+        }
+      },
+    });
+
+    if (!event) return;
 
     const user = ctx.session.user;
     if (!user) return;
