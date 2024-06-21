@@ -180,7 +180,11 @@ export const buildUserBot = (
       `${Commands.SendAnswerHomeWork}:${homeWork.id}`,
     );
 
-    await ctx.replyWithDocument(homeWork.filePath, { reply_markup: keyboard });
+    if (homeWork.text) {
+      await ctx.reply(homeWork.text, { reply_markup: keyboard });
+    } else if (homeWork.filePath) {
+      await ctx.replyWithDocument(homeWork.filePath, { reply_markup: keyboard });
+    }
     await ctx.answerCallbackQuery(`Задание от ${date}`);
   });
 

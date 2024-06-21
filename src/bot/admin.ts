@@ -45,8 +45,25 @@ export const buildAdminBot = (
 
     ctx.session.createHomeWork.step = CreateHomeWorkSteps.File;
     await ctx.answerCallbackQuery("Начало создания ДЗ");
-    await ctx.reply("Прикрепите файл");
+    await ctx.reply("Прикрепите файл или напишите текст");
   });
+
+  adminBot.use(async (ctx, next) => {
+    if (ctx.session.createHomeWork.step !== CreateHomeWorkSteps.File) return next();
+
+    const message = ctx.message?.text;
+    if (!message) return;
+
+    ctx.session.createHomeWork.data = {
+      answerEndDate: "",
+      text: message,
+    };
+
+    ctx.session.createHomeWork.step = CreateHomeWorkSteps.AnswerEndDate;
+    await ctx.reply(
+      "Введите дату окончания приёма ответов в формате год-месяц-деньTчасы:минуты:секундыZ\nПример: 2024-06-10T12:00:00Z",
+    );
+  })
 
   // Управление ДЗ
   adminBot.use(async (ctx, next) => {
@@ -62,7 +79,12 @@ export const buildAdminBot = (
 
     if (!homeWork) return await ctx.answerCallbackQuery("Не найдено");
 
-    await ctx.reply("Выберите тип:", { reply_markup: HomeWorkTypeMenu(id) });
+    if (homeWork.text) {
+      await ctx.reply(`${homeWork.text}\n\nВыберите тип:`, { reply_markup: HomeWorkTypeMenu(id) });
+    } else if (homeWork.filePath) {
+      await ctx.replyWithDocument(homeWork.filePath, { reply_markup: HomeWorkTypeMenu(id) })
+    }
+
     await ctx.answerCallbackQuery("Выберите тип");
   });
 
@@ -90,9 +112,10 @@ export const buildAdminBot = (
 
     const workbook = xlsx.utils.book_new();
     const worksheet = xlsx.utils.aoa_to_sheet([
-      ["ФИО", "Telegram username", "Ссылка"],
+      ["ФИО", "Номер телефона", "Telegram username", "Ссылка"],
       ...homeWork.HomeWorkAnswer.map(({ user, link }) => [
         user.fio,
+        user.phone,
         `https://t.me/${user.nickname}?text=${encodeURIComponent(`#${homeWork.id} Homework ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}`)}.\n\n`,
         link,
       ]),
@@ -105,7 +128,7 @@ export const buildAdminBot = (
     await ctx.replyWithDocument(
       new InputFile(
         stream,
-        `Ссылки ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}.xlsx`,
+        `(#${homeWork.id}) Ссылки ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}.xlsx`,
       ),
     );
     await ctx.answerCallbackQuery("Файл отправлен");
@@ -133,7 +156,7 @@ export const buildAdminBot = (
 
     if (!homeWork) return await ctx.answerCallbackQuery("Не найдено");
 
-    const answers: [string, string, string][] = [];
+    const answers: [string, string, string, string][] = [];
 
     for await (const answer of homeWork.HomeWorkAnswer) {
       if (!answer.filePath || !answer.user.fio) continue;
@@ -142,6 +165,7 @@ export const buildAdminBot = (
 
       answers.push([
         answer.user.fio,
+        answer.user.phone || "",
         `https://t.me/${answer.user.nickname}?text=${encodeURIComponent(`#${homeWork.id} Homework ${Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(homeWork.createdAt)}`)}.\n\n`,
         `https://api.telegram.org/file/bot${config.token}/${file.file_path}`,
       ]);
@@ -149,7 +173,7 @@ export const buildAdminBot = (
 
     const workbook = xlsx.utils.book_new();
     const worksheet = xlsx.utils.aoa_to_sheet([
-      ["ФИО", "Telegram username", "Ссылка на файл"],
+      ["ФИО", "Номер телефона", "Telegram username", "Ссылка на файл"],
       ...answers,
     ]);
 
@@ -186,6 +210,7 @@ export const buildAdminBot = (
     if (ctx.session.createHomeWork.step !== CreateHomeWorkSteps.AnswerEndDate)
       return next();
 
+    console.log("fffff")
     const message = ctx.message?.text;
     if (!message) return;
 
