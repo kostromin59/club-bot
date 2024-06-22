@@ -10,7 +10,7 @@ export const enum Commands {
   DeleteRegistrationToEvent = "DeleteRegisterToEvent",
   Users = "Пользователи",
   MakePayers = "Добавить платников",
-  DeletePayers = "Удалить платников",
+  RemovePayers = "Убрать платников",
   Homeworks = "Домашние задания",
   CreateHomework = "Создать ДЗ",
   HomeworksManage = "HomeworksManage",

@@ -18,7 +18,7 @@ export const EventsAdminMenu = () =>
 export const MakePayersMenu = new InlineKeyboard()
   .text(Commands.MakePayers, Commands.MakePayers)
   .row()
-  .text(Commands.DeletePayers, Commands.DeletePayers);
+  .text(Commands.RemovePayers, Commands.RemovePayers);
 
 export const UserMenu = new Keyboard()
   .text(Commands.Events)

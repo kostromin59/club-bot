@@ -63,7 +63,7 @@ export const buildAdminBot = (
     await ctx.reply(
       "Введите дату окончания приёма ответов в формате год-месяц-деньTчасы:минуты:секундыZ\nПример: 2024-06-10T12:00:00Z",
     );
-  })
+  });
 
   // Управление ДЗ
   adminBot.use(async (ctx, next) => {
@@ -82,7 +82,7 @@ export const buildAdminBot = (
     if (homework.text) {
       await ctx.reply(`${homework.text}\n\nВыберите тип:`, { reply_markup: HomeworkTypeMenu(id) });
     } else if (homework.filePath) {
-      await ctx.replyWithDocument(homework.filePath, { reply_markup: HomeworkTypeMenu(id) })
+      await ctx.replyWithDocument(homework.filePath, { reply_markup: HomeworkTypeMenu(id) });
     }
 
     await ctx.answerCallbackQuery("Выберите тип");
@@ -464,22 +464,17 @@ export const buildAdminBot = (
 
   // Добавить платников
   adminBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.MakePayers))
+    if (ctx.callbackQuery?.data?.startsWith(Commands.MakePayers)) {
+      ctx.session.payersStep = PayersSteps.MakePayers;
+      await ctx.reply("Укажите через запятую ID пользователей");
+      await ctx.answerCallbackQuery("Укажите через запятую ID пользователей");
+    } else if (ctx.callbackQuery?.data?.startsWith(Commands.RemovePayers)) {
+      ctx.session.payersStep = PayersSteps.DeletePayers;
+      await ctx.reply("Укажите через запятую ID пользователей");
+      await ctx.answerCallbackQuery("Укажите через запятую ID пользователей");
+    } else {
       return next();
-
-    ctx.session.payersStep = PayersSteps.MakePayers;
-    await ctx.reply("Укажите через запятую ID пользователей");
-    await ctx.answerCallbackQuery("Укажите через запятую ID пользователей");
-  });
-
-  // Удалить платников
-  adminBot.use(async (ctx, next) => {
-    if (!ctx.callbackQuery?.data?.startsWith(Commands.DeletePayers))
-      return next();
-
-    ctx.session.payersStep = PayersSteps.DeletePayers;
-    await ctx.reply("Укажите через запятую ID пользователей");
-    await ctx.answerCallbackQuery("Укажите через запятую ID пользователей");
+    }
   });
 
   // Сделать или убрать платников
